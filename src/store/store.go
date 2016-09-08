@@ -28,33 +28,18 @@ func New(path string) (*Store, error) {
 	return db, nil
 }
 
-func (db *Store) Stmt(query string) func(...interface{}) (sql.Result, error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return nil
-	}
-	return func(args ...interface{}) (sql.Result, error) {
-		defer tx.Commit()
-		stmt, err := tx.Prepare(query)
-		if err != nil {
-			return nil, err
-		}
-		defer stmt.Close()
-		return stmt.Exec(args...)
-	}
-}
-
 func (db *Store) StmtExec(query string, args ...interface{}) (sql.Result, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Commit()
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-	defer tx.Commit()
+
 	return stmt.Exec(args...)
 }

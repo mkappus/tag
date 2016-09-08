@@ -1,6 +1,8 @@
 package course
 
 import (
+	"database/sql"
+
 	"github.com/mkappus/tag/src/store"
 )
 
@@ -26,13 +28,30 @@ func (cs *CourseStore) Create(c Course) error {
 	}
 
 	for _, s := range c.Pupils {
-		_, err := cs.StmtExec(
+		// Courses can only add enrolled students
+		if !cs.isEnrolled(s.PermId) {
+			continue
+		}
+		_, err = cs.StmtExec(
 			"insert into student_course values(?,?)",
 			s.PermId, c.Id)
 	}
+
 	return err
 }
 
+func (cs *CourseStore) isEnrolled(permId int) bool {
+	err := cs.QueryRow("select exists(select 1 from students where perm_id=? LIMIT=1)", permId)
+	switch {
+	case err == sql.ErrNoRows:
+		return false
+
+	case err != nil:
+		return false
+
+	}
+	return true
+}
 func (cs *CourseStore) Read(id int) (Course, error) {
 	var c Course
 
@@ -47,20 +66,27 @@ func (cs *CourseStore) Read(id int) (Course, error) {
 
 func (cs *CourseStore) getStudents(cId int) (Students, error) {
 	var ss Students
-	rows, err := db.Query("select perm_id from student_course where course_id=?")
+	rows, err := cs.Query("select perm_id from student_course where course_id=?")
 	if err != nil {
 		return ss, err
 	}
 	for rows.Next() {
 		var s Student
 		_ = rows.Scan(&s.PermId)
-		_, err := cs.QueryRow("select * from students where perm_id=?", s.PermId).Scan(&s.PermId, &s.Grade, &s.Gu, &s.FirstName, &s.LastName)
+		err := cs.QueryRow("select * from students where perm_id=?", s.PermId).Scan(&s.PermId, &s.Grade, &s.Gu, &s.FirstName, &s.LastName)
 		if err != nil {
-			ss = append(ss, s)
+			ss = append(ss, &s)
 		}
 	}
 	return ss, rows.Err()
 }
+
+func (cs *CourseStore) updateStudentCourse(cId, permId int) error {
+	_, err := cs.StmtExec("update student_course set course_id=? where perm_id=?", cId, permId)
+	return err
+
+}
+
 func (cs *CourseStore) Update(id int, c Course) error {
 	_, err := cs.StmtExec(
 		"update courses set ?, ? where id=?",

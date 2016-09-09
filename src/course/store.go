@@ -1,14 +1,12 @@
 package course
 
-import (
-	"database/sql"
+import "github.com/mkappus/tag/src/store"
 
-	"github.com/mkappus/tag/src/store"
+type (
+	CourseStore struct {
+		*store.Store
+	}
 )
-
-type CourseStore struct {
-	*store.Store
-}
 
 func NewStore() (*CourseStore, error) {
 	s, err := store.New("data/madison.db")
@@ -40,18 +38,30 @@ func (cs *CourseStore) Create(c Course) error {
 	return err
 }
 
+func (cs *CourseStore) Enroll(s *Student) error {
+	_, err := cs.StmtExec(
+		"insert into students values (?,?,?,?,?)",
+		s.PermId, s.Grade, s.Gu, s.FirstName, s.LastName)
+	return err
+}
+
+func (cs *CourseStore) Unenroll(permId int) error {
+	_, err := cs.StmtExec(
+		"delete from students where perm_id=?",
+		permId)
+
+	return err
+}
+
 func (cs *CourseStore) isEnrolled(permId int) bool {
-	err := cs.QueryRow("select exists(select 1 from students where perm_id=? LIMIT=1)", permId)
-	switch {
-	case err == sql.ErrNoRows:
+	var exists int
+	_ = cs.QueryRow("select exists(select 1 from students where perm_id=? LIMIT=1)").Scan(&exists)
+	if exists == 0 {
 		return false
-
-	case err != nil:
-		return false
-
 	}
 	return true
 }
+
 func (cs *CourseStore) Read(id int) (Course, error) {
 	var c Course
 

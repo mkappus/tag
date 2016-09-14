@@ -30,9 +30,7 @@ func (cs *CourseStore) Create(c Course) error {
 		if !cs.isEnrolled(s.PermId) {
 			continue
 		}
-		_, err = cs.StmtExec(
-			"insert into student_course values(?,?)",
-			s.PermId, c.Id)
+		err = cs.addStudentToCourse(s.PermId, c.Id)
 	}
 
 	return err
@@ -91,6 +89,11 @@ func (cs *CourseStore) getStudents(cId int) (Students, error) {
 	return ss, rows.Err()
 }
 
+func (cs *CourseStore) addStudentToCourse(pId, cId int) error {
+	_, err := cs.StmtExec("insert or ignore into student_course perm_id, course_id values(?,?)", pId, cId)
+	return err
+}
+
 func (cs *CourseStore) updateStudentCourse(cId, permId int) error {
 	_, err := cs.StmtExec("update student_course set course_id=? where perm_id=?", cId, permId)
 	return err
@@ -102,12 +105,24 @@ func (cs *CourseStore) Update(id int, c Course) error {
 		"update courses set ?, ? where id=?",
 		c.Instructor.Id, c.Title, id)
 
+	if err != nil {
+		// If updating the course was successful, refresh the students
+		for _, p := range c.Pupils {
+			err = cs.updateStudentCourse(c.Id, p.PermId)
+		}
+	}
 	return err
 }
 
 func (cs *CourseStore) Delete(id int) error {
 	_, err := cs.StmtExec(
-		"delete from courses where id=?",
-		id)
+		"delete from courses where id=?", id)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = cs.StmtExec("delete from course_store where course_id=?", id)
+
 	return err
 }

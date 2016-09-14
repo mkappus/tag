@@ -12,11 +12,14 @@ create table student_course (
 );
 
 create table reservations (
-  id integer primary key not null,
-  course_id integer,
-  location_id integer,
-  start datetime,
-end datetime,
+	id integer primary key not null,
+	title text,
+	created integer,
+	modified integer,
+	start integer,
+end integer,
+creator_id integer,
+course_id integer,
 is_active tinyint
 );
 
